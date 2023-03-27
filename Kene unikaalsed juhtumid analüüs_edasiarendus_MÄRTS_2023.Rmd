@@ -1,0 +1,859 @@
+---
+title: "Deminutiivsufiks -kene unikaalsete esinemiste andmestik: analüüs lähtuvalt kvantitatiivsete meetodite kursusest"
+author: "Kaarel Veskis"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+
+```
+
+## Deminutiivsufiks -kene ainsuse nominatiivi vormide kasutamine regilaulutekstides
+
+## Dataset II: unique cases of the diminutive suffix -kene in the runosongs corpus
+
+```{r}
+
+#library(openai)
+#Sys.setenv(OPENAI_API_KEY = "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")
+#gptstudio:::chat_gpt_addin()
+
+library(dplyr)
+library(tidyverse)
+library(tibble)
+
+# Algandmed saadud HeidiSQL-is skripti abil:
+#C:\Users\kaarel.veskis\OneDrive - Eesti Kirjandusmuuseum\2022 DOKTORANTUUR AINED\Kene_unikaalsed_juhtumid_Susanna_Skript_mai_2022.txt
+
+# Edasi: kuna tabel sisaldab nii semikooloneid kui tabulaatorimärke, siis salvestatud HeidiSQL-is nii, et field separator on \0. Siis tabid tekstiväljades kustutatud (kuna ilmselt pole uurimisküsimuse seisukohalt vähemalt tähenduslikud) ja \0 teisendatud tabiks, et saaks R-is andmestikku töödelda. 
+# Aga kahjuks see loeb üksnes Heidis salvestatud default seadetega csv tabelit, mis notepad++-is muudetdu UTF-8-ks:
+dat <- read.csv("C:/Users/kaarel.veskis/OneDrive - Eesti Kirjandusmuuseum/2022 DOKTORANTUUR AINED/kene_juhtumid_juuni_2022_uuesti_salvestatud_heidist_default_seaded.csv", header = T, sep = ";", quote = "\"",
+         dec = ".", fill = TRUE, comment.char = "", encoding = "UTF-8")
+
+dat_osakaalud <- read.csv2("KeneAndmedKvantmeetodite_Kursuse_Lõputööks_5.csv", header = T, sep = ";", quote = "\"", dec = ".", fill = TRUE, comment.char = "", encoding = "UTF-8")
+
+
+# muudame ära tulpade nimed
+# "kogus";"text";"text";"name";"sonaalgus";"sonalopp" ->
+# sagedus, sõnavorm, värsirida, regioon, sonaalgus, sonalopp
+colnames(dat) <- c('sagedus','sõnavorm','värsirida', 'regioon', 'sonaalgus', 'sonalopp')
+
+# kene sõnede keskmine pikkus tähemärkides
+mean(nchar(dat$sõnavorm))
+
+#Vaja on R-is sageduste tulp teisendada numbriliseks, et järgnevad skriptid töötaksid.
+dat$sagedus <- as.numeric(as.character(dat$sagedus))
+
+dat_osakaalud$kene_värsiridu_kokku <- as.numeric(as.character(dat_osakaalud$kene_värsiridu_kokku))
+
+dat_osakaalud$kene_värsiridadest <- as.numeric(gsub(",", ".", as.character(dat_osakaalud$kene_värsiridadest)))
+
+
+# lyhiduse huvides peamised tunnused muutujatesse
+kene_lopp <- dat$sonalopp
+kene_algus <- dat$sonaalgus
+sagedus <- dat$sagedus
+
+kene_värsiridade_sagedus <- dat_osakaalud$kene_värsiridu_kokku
+
+```
+
+### Kokkuvõte andmestikust: algse tabeli struktuur, algus ja lõpp, peamise uuritava tunnuse (-kene-sufiksi) jaotumine võrreldes teiste tunnustega andmestikus (sagedus, sõnavorm, regioon, värsirida)
+
+The second dataset derived from the FILTER database has been formed to analyse the distribution of occurrences (tokens) of word forms in the Estonian runosongs with the nominative singular form of diminutive suffix -kene. The resulting table has 68.000 occurrences of the suffix as table rows and 7 independent variables, characterizing the distribution of the tokens:
+
+ the absolute frequency of the diminutive word form in the corpusthe complete verse line of the regilaul text where the word form originates from
+
+ the corresponding parish of the text
+
+ the base word of the corresponding word form (not lemmatized, just the word form without the suffix)
+
+ the diminutive suffix form (the suffix part of the complete token separated from the base word)
+
+ absolute frequencies of the corresponding suffix and base form in the corpus.
+
+Täiendasin algset andmestikku, lisades sinna andmestikus iga -kene-sufiksi ning ilma sufiksita sõnaalguste esinemissagedused eraldi tulpadesse. Vaatlesin sufiksite jaotumist lisaks ka seoses nende sagedustega.
+
+My first aim was to determine the most frequent -kene suffix nominative dialectal forms used in the runosongs corpus. The results confirm the hypothesis that the most frequent form is the form used in the contemporary written Estonian -kene (95226 occurrences in the corpus). The most frequent dialectal forms differing from the form -kene of the suffix are according to my results: -kõnõ (6725 occurrences) and -keine (2119 occurrences)
+
+
+It appears that in all parishes in Estonia the most frequent form of this suffix family is the today's written language's norm of the suffix -kene and that there are some rare dialectal forms of the suffix (e.g. -kane) that have been used rarely but still on a wide geographical area (-kane is the least popular form of the suffix in 43 regions registered in the dataset, however this suffix form has also an other meaning „made from").
+
+```{r}
+
+#kokkuvõte kogu andmestikust
+str(dat) # näita tabeli struktuuri
+summary(dat) # näita ülevaadet tabeli tunnustest
+dim(dat) # mitu rida ja mitu tulpa on tabelis?
+head(dat) # näita tabeli esimesi ridu
+tail(dat) # näita tabeli viimaseid ridu
+
+
+
+# peamine uuritav tunnus (kene_lopp) jaotub nii:
+
+library(ggplot2)
+
+table(dat$sonalopp)
+
+
+
+# 10 sagedasemat -kene-vormi:
+data.frame(table(dat$sonalopp)) -> sonalopp_df
+
+sonalopp_df %>% 
+    arrange(desc(Freq)) %>%
+    slice(1:10) %>%
+    ggplot(., aes(x=Var1, y=Freq))+
+    geom_bar(stat='identity')+
+theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "KENE",
+       y = "SAGEDUS",
+       title = "") 
+
+# sõnavormi SAGEDUSE JAOTUMINE + KENE_LÕPP + tüvi
+
+ggplot(dat,
+       aes(x = reorder(kene_lopp, sagedus, FUN = mean),
+           y = sagedus, label = sonaalgus)) +
+   geom_boxplot() +
+  geom_text(check_overlap = TRUE,
+           position=position_jitter(width=0.15), size=2.5)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "sufiksi vorm",
+       y = "sõnavormi sagedus",
+       title = "") 
+
+# andmestikku iga sõnalõpu ja ilma sufiksita sõnaalguse sageduse lisamine
+# 
+# dat2 on uus tabel koos kene-vormi sagedusega
+dat %>% add_count(sonalopp, name = "kene_lopu_sagedus") -> dat2 
+
+# andmestikku iga sõnavormi sageduse lisamine
+# kõigepealt sõnavormide ja nende sageduste tabel
+as.data.frame(table(dat2$sõnavorm)) -> kenesonede_tabel
+
+# alternatiivne ja ehk sobivam võimalus selleks:
+# dat3 on uus tabel koos sõnaalguse sagedusega
+dat2 %>% add_count(sonaalgus, name = "sõnatyve_sagedus") -> dat3 
+
+# täiendatud tabel dat2 - faili:
+write.table(x = dat2,
+            file = "kene_juhtumid_pluss_sufiksi_sagedused_06_2022.csv", 
+            quote = FALSE, 
+            sep = "\t",
+            row.names = F) 
+
+# täiendatud tabel dat3 - faili:
+# väljund sisaldab vigu, parandada!!! Võibolla juba eelmine dat2 csv!!!
+# Analoogsel meetodil saab lisada ka värsiridade sagedused, kuid värsiread tuleks puhastada kirjavahe- jm märkidest enne:
+write.table(x = dat3,
+            file = "kene_juhtumid_pluss_sufiksi_ja_tyve_sagedused_06_2022.csv", 
+            quote = FALSE, 
+            sep = "\t",
+            row.names = F) 
+
+# kene_lõpu SAGEDUS ~ KENE_LÕPP
+
+ggplot(dat2,
+       aes(x = reorder(sonalopp, kene_lopu_sagedus, FUN = mean),
+           y = kene_lopu_sagedus, label = kene_lopu_sagedus)) +
+   geom_boxplot() +
+  geom_text(check_overlap = TRUE,
+           position=position_jitter(width=0.15), size=2.5)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "sonalopp",
+       y = "kene_lopu_sagedus",
+       title = "") 
+
+# sõnalõppude ja nende sageduste dataframe
+as.data.frame(table(dat$sonalopp)) -> sonaloppude_tabel
+
+# sõnaalguste ja nende sageduste dataframe
+as.data.frame(table(dat$sonaalgus)) -> sonaalguste_tabel
+
+# sõnalõppude sagedustabel
+t.sonalopp <- table(dat3$sonalopp) 
+t.sonalopp
+
+# Sagedasimate kene-lõppude jaotumine 
+
+sonaloppude_tabel[order(sonaloppude_tabel$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(7) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + coord_flip()
+
+# tabel, kus on kene lõppudega sõnavormide sagedused regiooniti
+as.data.frame(table(dat$sonalopp, dat$regioon)) -> regioonide_sonaloppude_tabel
+
+
+
+# regiooniti -kene vormide koond (GPT)
+summarized_data <- dat %>%
+     group_by(regioon, sonalopp) %>%
+     summarize(count = n()) %>%
+     arrange(desc(count)) %>%
+     head(20)
+
+
+# lihtsalt regioonide sagedustabel
+dat %>%
+  filter(!is.na(regioon)) %>%
+  count(regioon) -> regioonide_sagedused
+
+
+
+# i have a dataset that has as one variable the regions (dat_osakaalud$kihelkond) and as an other column the total amount of something in each region (dat_osakaalud$kene_värsiridu_kokku). I want to dislplay as table the top 10 regions where dat_osakaalud$kene_värsiridu_kokku is highest and then on 11th row of the table the values of dat_osakaalud$kene_värsiridu_kokku of all the other regions summarized
+
+# dat_osakaalud %>%
+#  arrange(desc(kene_värsiridu_kokku)) %>%
+#  top_n(10, wt = kene_värsiridu_kokku) %>%
+#  bind_rows(
+ #   dat_osakaalud %>%
+#      filter(!kihelkond %in% top_n(10, kene_värsiridu_kokku, wt = kene_värsiridu_kokku)$kihelkond) %>%
+  #    summarise(kihelkond = "Other", kene_värsiridu_kokku = sum(kene_värsiridu_kokku))
+ # )
+
+
+dat_osakaalud %>%
+  arrange(desc(kene_värsiridu_kokku)) %>%
+  top_n(10, wt = kene_värsiridu_kokku) -> top_värsiridu
+
+top_värsiridu %>%
+  bind_rows(
+    dat_osakaalud %>%
+      filter(!kihelkond %in% top_värsiridu$kihelkond) %>%
+      summarise(kihelkond = "Ülejäänud", kene_värsiridu_kokku = sum(kene_värsiridu_kokku))
+  ) -> regioonide_koondtabel_keneridu
+
+regioonide_koondtabel_keneridu[,c(1,4)]
+
+names(regioonide_koondtabel_keneridu)[c(1,4)] <- c("Kihelkond", "Värsiridu")
+
+
+View(regioonide_koondtabel_keneridu[,c(1,4)])
+
+dat_osakaalud %>%
+  arrange(desc(kene_värsiridadest)) %>%
+  top_n(10, wt = kene_värsiridadest) -> top_osakaalud
+
+
+top_osakaalud %>%
+  bind_rows(
+    dat_osakaalud %>%
+      filter(!kihelkond %in% top_osakaalud$kihelkond) %>%
+      summarise(kihelkond = "Ülejäänud (keskm)", kene_värsiridadest = mean(kene_värsiridadest))
+  ) -> regioonide_koondtabel_keneosakaalud
+
+
+regioonide_koondtabel_keneosakaalud[,c(1,5)]
+
+names(regioonide_koondtabel_keneosakaalud)[c(1,5)] <- c("Kihelkond", "Osakaal värsiridadest")
+
+
+View(regioonide_koondtabel_keneosakaalud[,c(1,5)])
+
+View(regioonide_koondtabel_keneosakaalud[,c(1,5)])
+
+cbind(regioonide_koondtabel_keneosakaalud[,1], round(regioonide_koondtabel_keneosakaalud[,5], digits = 3)*100) -> osakaalutabel
+
+osakaalutabel <- as.data.frame(osakaalutabel)
+
+names(osakaalutabel) <- c("Kihelkond", "Osakaal värsiridadest (%)")
+
+View(osakaalutabel)
+
+# edasiarendus GPT
+#This code first adds a column "rank" to keep track of the order of the regions, then filters the data to only include the top 10 regions based on the rank. After renaming the columns and converting the data to a tibble, a column "Rank" is added to the tibble to provide a numerical ranking for each region. Finally, a row is added for the "Other" category to capture the remaining regions that are not in the top 10, and the data is rearranged to include only the columns "Rank", "Region", and "Frequency".
+#In this code, we first count the frequency of regions that are not in the top 10, and then calculate the sum of their frequencies. This sum is then added as the frequency for the "Ülejäänud" category in the final tibble.
+dat %>%
+  filter(!is.na(regioon)) %>%
+  count(regioon) %>%
+  arrange(desc(n)) %>%
+  mutate(rank = row_number()) %>%
+  filter(rank <= 10) %>%
+  rename(Kihelkond = regioon, Sõnavorme = n) %>%
+  as_tibble() %>%
+  mutate(Rank = 1:nrow(.)) %>%
+  add_row(Kihelkond = "Ülejäänud", Sõnavorme = sum(dat %>% filter(!regioon %in% .$Kihelkond) %>% count(regioon) %>% .$n), Rank = 11) %>%
+  select(Kihelkond, Sõnavorme) -> regioonide_koondtabel_kenevorme
+
+View(regioonide_koondtabel_kenevorme)
+
+
+#There are several packages in R that you can use to create tables in a correctly formatted format, 
+
+library(grid)
+library(gridExtra)
+
+windows()
+
+grid.table(regioonide_koondtabel_kenevorme)
+grid.table(regioonide_koondtabel_keneridu[,c(1,4)])
+grid.table(regioonide_koondtabel_keneosakaalud[,c(1,5)])
+grid.table(osakaalutabel)
+
+par(mar = c(5, 4, 4, 2) + 0.1)
+grid.table(regioonide_koondtabel_kenevorme)
+grid.newpage()
+windows()
+grid.table(regioonide_koondtabel_kenevorme, rows = NULL, theme = ttheme_default(core=list(bg_params=list(fill='white'), text.size=12)))
+
+grob_table <- grid.table(regioonide_koondtabel_kenevorme, rows = NULL, theme = ttheme_default(core=list(bg_params=list(fill='white'), text.size=12)))
+grid.newpage()
+grid.draw(grob_table)
+grid.echo()
+
+
+
+
+
+
+
+grid.export("regioonide_koondtabel.png")
+
+
+
+
+
+summarized_data$proportion <- summarized_data$count / nrow(dat)
+
+ggplot(summarized_data, aes(x = regioon, y = count)) +
+    geom_bar(stat = "identity") +
+    ylab("Frequency") +
+    xlab("Region")
+
+ggplot(summarized_data, aes(x = regioon, y = proportion)) +
+    geom_bar(stat = "identity") +
+    ylab("Frequency") +
+    xlab("Region")
+
+# Sufiksid grupeeritud regiooniti
+
+reg_sufiks_matrix <- as.matrix(regioonide_sonaloppude_tabel)
+
+# Extract the Freq column from the matrix
+freq_col <- reg_sufiks_matrix[, 3]
+
+# Convert the Freq column from character to numeric
+freq_col <- as.numeric(freq_col)
+
+regioonide_sonaloppude_tabel %>%
+    group_by(Var2) -> t.reg_sufiks_grouped
+
+freq_vec <- as.vector(t.reg_sufiks_grouped)
+
+freq_table <- table(t.reg_sufiks_grouped$Var1, t.reg_sufiks_grouped$Var2, t.reg_sufiks_grouped$Freq)
+
+freq_vec <- as.vector(freq_table)
+
+
+
+
+#  Mis on olnud eri regioonides kõige populaarsem (= sagedamini valitud) kene-lõpp?
+# pole ühtki regiooni, kus -kene poleks populaarseim lõpp
+# mis on aga populaarsuselt teine lõpp regiooniti?
+
+(dat2 %>%
+  group_by(regioon, sonalopp) %>%
+  summarise(n = n()) %>%
+  filter(n == max(n)) -> regiooniti_max_kenevorm)
+
+
+# regiooniti vähimpopulaarne -kene-lõpp
+(dat2 %>%
+  group_by(regioon, sonalopp) %>%
+  summarise(n = n()) %>%
+  filter(n == min(n)) -> regiooniti_min_kenevorm)
+
+# Teha - mis on piirkonniti populaarseim sufiks?
+# Teha - mis on piirkonniti populaarseim sõnatyvi?
+
+# Teha - kas saab ühendada varasema kihelkonniti kene-osakaalude andmed?
+#Saaks ilmselt lisada maakonnad, et saaks näidata suuremate piirkondade statistikat
+
+
+
+```
+
+### Sufiksile eelneva lemmatiseerimata SÕNAALGUSE SAGEDUSE jaotumine
+
+Üht -kene-lõpuga sõnavormi on andmestikus keskmiselt 259. Sagedusega \> 2000 on andmestikus suhteliselt vähe -kene-sõnavorme.
+
+The base word frequency analysis shows that the suffix family has been most frequently used in regilaul when indicating young girls (neitsikene = young girl, linnukene = ,"little bird", poetic synonym of a young girl) but among the most frequent base words with the suffix there are also young as well as older female and male referents (poisikene = young boy, memmekene = mother or older woman, taadikene = father, grandfather or older man).
+
+The most common base word of the suffix can point to either male or female referent, depending on the region or the suffix form used.
+
+```{r}
+
+# sõnavormi sageduse standardhälve ja jaotumine
+sd(sagedus)
+range(sagedus)
+
+# üht -kene-sõnavormi on andmestikus keskmiselt 259 ja sagedusega > 2000 on suhteliselt vähe sõnavorme
+median(sagedus)
+# plot(sagedus)
+
+
+# sõnavormi sagedus:
+t.sonavorm <- table(dat3$sõnavorm) 
+head(t.sonavorm)
+df_vorm <- data.frame(t.sonavorm)
+
+# sorteerituna
+head(df_vorm[rev(order(df_vorm$Freq)),], 40)
+
+# Erinevaid -kene vorme kokku piirkonniti, gpt2:
+
+# Create a new data frame that summarizes the data by grouping by the variable 'regioon' and counting the frequencies of each group using the dplyr library:
+summarized_data <- dat %>%
+  group_by(regioon) %>%
+  summarize(count = n())
+
+# Sort the summarized data by the 'count' column in descending order using the arrange() function:
+summarized_data <- summarized_data %>%
+  arrange(desc(count))
+
+# Select the top 20 rows of the summarized data using the slice() function:
+summarized_data <- summarized_data %>%
+  slice(1:20)
+
+# Calculate the proportions of each group by dividing the 'count' column by the total number of observations in the original data frame:
+summarized_data$proportion <- summarized_data$count / nrow(dat)
+
+# Use the ggplot2 library to create a bar plot of the summarized data, with the 'regioon' variable on the x-axis and the 'count' and 'proportion' variables on the y-axis:
+ggplot(summarized_data, aes(x = reorder(regioon, count), y = count)) +
+    geom_bar(stat = "identity") +
+    ylab("Frequency") +
+    xlab("Region") +
+    coord_flip()
+
+# To display both the absolute and proportional values on the y-axis, you can use the facet_wrap() function to create two panels, one for each variable:
+# EI TÖÖTA
+ggplot(summarized_data, aes(x = regioon)) +
+  geom_bar(aes(y = count), stat = "identity") +
+  ylab("Frequency") +
+  xlab("Region") +
+  facet_wrap(~ variable, scales = "free_y")
+
+# Eraldi -kene ja -kõnõ sagedus Setumaal - erineb algsest arvutusest:
+counts <- dat %>%
+    filter(regioon == "Setumaa") %>%
+    filter(sonalopp %in% c("kene", "kõnõ")) %>%
+    group_by(sonalopp) %>%
+    summarize(count = n())
+
+# To count the occurrences of values of the variable 'sonalopp' where the value of the variable 'regioon' is 'Setumaa', you can use the following code:
+
+subset_data <- subset(dat, regioon == "Setumaa")
+counts <- table(subset_data$sonalopp)
+
+# To add the counts together, you can use the following code (# This will give you the total number of occurrences of the values of the variable 'sonalopp' where the value of the variable 'regioon' is 'Setumaa'.):
+
+sum(counts)
+
+
+# Sagedasimate sõnaalguste jaotumine 
+
+sonaalguste_tabel[order(sonaalguste_tabel$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(14) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + coord_flip()
+
+# dataframe, kus on sõnaalguste sagedused regiooniti
+as.data.frame(table(dat$sonaalgus, dat$regioon)) -> regioonide_sonaalguste_tabel
+
+# Tabel, kus sõnaalgused grupeeritud regiooniti
+
+regioonide_sonaalguste_tabel %>%
+    group_by(Var2) -> t.reg_baseform_grouped
+
+t.sonaalgus <- table(dat3$sonaalgus) 
+# sõnaalguste jaotumise täielik tabel:
+# t.sonaalgus
+
+#  mis on olnud eri regioonides kõige populaarsem (= sagedamini valitud) sõnaalgus 
+
+
+dat2 %>%
+  group_by(regioon, sonaalgus) %>%
+  summarise(n = n()) %>%
+  filter(n == max(n)) -> regiooniti_max_sonaalgus
+
+#  mis on sõltuvalt sufiksi vormist kõige populaarsem  sõnaalgus 
+
+dat2 %>%
+    group_by(sonalopp, sonaalgus) %>%
+    summarise(n = n()) %>%
+    filter(n == max(n)) -> sonaloputi_max_sonaalgus
+
+# et  max sõnaalguste tabelit saaks paremini kasutada:
+as.data.frame(regiooniti_max_sonaalgus) -> t.max.algus
+
+t.max.algus %>% arrange(desc(n))  -> t.max.algus
+
+t.max.algus %>% slice(1:15) -> t.max.algus
+
+colnames(t.max.algus)[1] <- "region"
+colnames(t.max.algus)[2] <- "base_word"
+colnames(t.max.algus)[3] <- "count"
+
+# et seda max sõnalõputi sõnaalguste tabelit saaks paremini kasutada:
+as.data.frame(sonaloputi_max_sonaalgus) -> t.max.lopp
+
+t.max.lopp %>% arrange(desc(n))  -> t.max.lopp
+
+t.max.lopp %>% slice(1:15) -> t.max.lopp
+
+colnames(t.max.lopp)[1] <- "suffix form"
+colnames(t.max.lopp)[2] <- "base_word"
+colnames(t.max.lopp)[3] <- "count"
+
+# NB! t.max.lopp sisaldab vorme pihlakane ja kikkani, mida vist ei tohiks olla - kontrolli, kas kane ikkagi on üldiselt piisavalt deminutiiv
+
+
+# populaarsemad -kene-lõpuga sõnatüved regiooniti:
+ggplot(t.max.algus,
+       aes(x= region,
+           y = base_word )) + geom_point() +  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+# Sõnaalguste ja sõnalõppude risttabel
+# Sagedused siin samad mis tabelis t.sonavorm
+
+
+t.sonaalgus.sonalopp <- table(dat3$sonaalgus, 
+                     dat3$sonalopp)
+
+# populaarsemad sõnatüved kene-vormiti
+# Annab  sõnatüve ja sufiksi koosesinemise sagedused
+as.data.frame(t.sonaalgus.sonalopp) -> t.a_l
+head(t.a_l[rev(order(t.a_l$Freq)),], 50)
+
+
+
+
+
+```
+
+### Koos sufiksiga sõnavormi jaotumine
+
+```{r}
+data.frame(t.sonavorm) -> sonavorm_df
+sonavorm_df %>% 
+    arrange(desc(Freq)) %>%
+    slice(1:7) %>%
+    ggplot(., aes(x=Var1, y=Freq))+
+    geom_bar(stat='identity')
+
+```
+
+### VÄRSIRIDADE JAOTUMINE
+
+Veel tegemata: Värsiridade tulba abil vaadata, mis sõnad on sagedamini eelnevad kene-sõnale. Kuidas: jagada värsirida sõnede datafreimiks ning sisestada tabelisse uus tulp: värsireas sõnavorm miinus 1. Saab ka vaadata, kas värsireas on üks või mitu kene-vormi.
+
+```{r}
+
+# punktuatsiooni eemaldamine
+dat2$värsirida <- str_replace_all(dat2$värsirida, "[[:punct:]]", "")
+
+# värsiread, kus punktuatsioon eemaldatud, tabelisse
+t.värsirida <- table(dat2$värsirida) 
+as.data.frame(table(dat2$värsirida)) -> värsiridade_tabel
+
+#joonistame sagedasemad värsiread
+värsiridade_tabel[order(värsiridade_tabel$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(14) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + coord_flip()
+
+
+# sagedusarvude paremaks vaatlemiseks
+# sorteerituna
+# Selle abil saaks välja selekteerida levinumad -kene-deminutiiviga püsivormelid, aga kust läheb piir, millest suurema sagedusega värsiridade puhul on tegu püsivormeliga?
+head(värsiridade_tabel[rev(order(värsiridade_tabel$Freq)),], 50)
+
+
+#t.värsirida <- table(dat3$värsirida)
+
+```
+
+### Kolmas andmestik (katse): Levinumate -kene-deminutiivide sõnatüved ja nende põhjal sufiksite andmestiku täiendamine: 1) NEITSI (Further studies and practical output)
+
+Järgnev plaan võib tunduda esmapilgul keeruline, kuid tegelikult ei ole, kuigi ma veel pole jõudnud teostada. Eelnevalt tuvastasin iga -kene-vormi puhul esinevad levinumad sõnatüved. Kõigi -kene-vormide kohta on levinuim sõnatüvi 'neitsi'. Leitud -kene-sufiksitega koos esinevate sõnatüvede andmestikku peaks saama kasutada selleks, et regilaulukorpuses tuvastada ja märgendada mitte ainult kõik nominatiivsed -kene-deminutiivsõnade vormid, vaid suurem osa kõigist deminutiivsõnadest ükskõik millises käändes või murdevormis. Näiteks: teame, et tüvi 'neitsi' on korpuses kasutusel deminutiivsõnades. Kogu regilaulukorpuses saab teha päringu: otsi nõnda leitud (levinumaid?) deminutiivide juursõnu sõnede algusest (+ k-täht?) - otsing "neitsik.\*" annab ka "neitsikõztõle" jne - nii peaks saama tuvastada suure osa selle juursõnaga deminutiivsõnavorme korpuses. Saab tekitada nende vormide sagedusloend ja vaadata, kui suur osa neist on reaalselt kene-liite käändevormid. Kui valdavalt on, siis saab regilaulukorpuses kõik sõned, mis lõppevad selles sufiksivormide loendis sisalduva vormiga, märgendada -kene-deminutiividena. Järgnevalt saab regilaulukorpuses märgendada deminutiivid umbes nii: Kõigi sõnatüvede 'neitsi' puhul lisa korpusse nominatiivivormi märgend umbes nii --- "Nuta nuta \<deminutiiv = Nom_Form="neitsikene"\>neitsikäine</deminutiiv> ..." Saab märgendada ka liitsõnad, kui lisada tabelisse sõnatüvede tulba põhjal eraldi tulpa info selle kohta, kas sõnatüvi sisaldab teist sõnatüve ja millist -- selle põhjal saab teada, kas tegu on tõenäoliselt liitsõnaga, näiteks saab siis märgendada: \<deminutiiv Nom_liitsõna_juursõna="neitsi" siidineitsikäine<\/deminutiiv>
+
+Proovisin korpusest leida kõik 'neitsik.\*' vorme, mis ei ole kene nominatiiv ja on pikad vähemalt 2 k-le järgnevat tähemärki, ning koostasin leitud sõnavormide sufiksite loendi. Viimases tabelis on esitatud selle otsingu põhjal korpusest leitud mittenominatiivsed sõnatüve 'neitsi' sufiksid. Ilmneb, et tegu on tõesti -kene-sufiksi mittenominatiivsete vormidega nii ainsuses kui mitmuses. Teiste nominatiivsete -kene-sufiksite sõnatüvede loendi abil peaks saama samal moel mittenominatiivsete deminutiivsufiksite loendit täiendada.
+
+Hüpotees: Kasutades nõnda saadud sõnatüvede ja mittenominatiivsete deminutiivsufiksite loendeid (kombineerides neid nominatiivsete -kene-deminutiivsufiksite loendiga) korpusepäringus on võimalik arvestatav osa regilaulukorpuse deminutiividest tuvastada ja seejärel märgendada(mis ühtlasi kujutab endast antud uurimuse praktilist väljundit). Veel tegemata: hindasin, kui palju nõnda leitud sõnavorme ja sufikseid ei ole tegelikult deminutiivsed. Tulemused: ...
+
+I will try to interpret these and other results obtained thus far by connecting them to previous studies on diminutives as well as studies on lexicon and language of the runosongs and by analysing the context of diminutive words using also the verse line fields (context) of the dataset. Also worth examining and adding to datasets of diminutive words of runosongs are data about the poetic metre (e.g syllable counts).
+
+As one practical output of analysing these datasets, I plan to add a layer of initial annotation to the corpus of Estonian runosongs that could serve as a starting point for normalization (and lemmatization) of all words in the runosongs corpus: The dataset can be used to annotate most of the diminutives in nominative singular form of the suffix -kene in the corpus. In addition, using the diminutive base word list in the second dataset, it should be possible to automatically detect most of suffix -kene forms in other cases besides the nominative forms (including plural forms of the short suffix form -ke). I tested this hypothesis, generating, with a SQL query,  a list of other forms of diminutive ending -kene of the most frequent base word in my previous dataset *neitsi* (= „unmarried girl, virgin"), excluding all nominative forms from the result [[1]](#_ftn1).
+
+
+In the resulting list, the most frequent forms are singular genitive (-*kesta*), plural partitive (-*keste*) and plural nominative (-*kesed*).
+
+Hypothesis to be tested: by generating an additional list of all forms of the suffix -*kene* of the -*kene* diminutives base word list with this method and combining this list with the runosongs corpus, most of the diminutives in different grammatical and dialectal forms in runosongs texts can be detected, manually annotated with the semantically equivalent nominative word of today's written language (eg: **\<diminutive meaning="neitsi", grammatical analysis = "nominative = False"\> *neitsikõista* \</diminutive\>** ) and extracted from the corpus to form a complete dataset of -*kene*-diminutives of Estonian runosongs. The resulting dataset enables more thorough corpus analysis of diminutives of Estonian runosongs. A reasonable next step might be to try to detect multi-word regilaul-specific idioms and poetic synonyms containing diminutives with the help of e.g KWIC analysis of the automatically derived diminutive forms list.
+
+```{r}
+
+# Teha - mis on iga kene-vormi populaarseimad tüved? -- Kui leian kõik ühe tüve vormid, siis peaksin saama sedaviisi märgendada korpuses kõik kene-nominatiivi vormid, kasutades leitud iga kene-vormi populaarsemat sõnatüve. 
+
+# Kuidas teha, vt: otsinguga "r code find all strings in column containing" https://stackoverflow.com/questions/13043928/selecting-data-frame-rows-based-on-partial-string-match-in-a-column
+
+# Vt kuidas jagunevad nii leitud liitsõnade ja juursõnade tulbad
+
+# Otsi kõiki neitsik.* vorme, mis ei tohiks olla kene nominatiiv ja on pikk vähemalt 2 k-le järgnevat tähemärki, väljasta leitud sõnalõpud
+#SELECT C.text AS eelmine_rida, A.text AS rida, B.text AS jargmine_rida, REGEXP_replace(A.text,".+neitsi", "") as kenelopp FROM words
+  #  JOIN word_occ ON words.w_id=word_occ.w_id
+  #  JOIN verses AS A ON word_occ.v_id=A.v_id
+  #  JOIN verses AS B ON A.v_id + 1 = B.v_id
+  #  JOIN verses AS C ON A.v_id - 1 =C.v_id
+ #   JOIN verse_poem ON A.v_id=verse_poem.v_id
+  #  JOIN poems ON verse_poem.p_id=poems.p_id 
+  #  WHERE A.type = "V" /*AND B.type="V" */ AND poems.collection = "erab" AND A.text REGEXP ".+neitsik[aeiouõäü][^,. ][^,. ]*[[:>:]]"
+#	 AND NOT A.text REGEXP ".+k[aeiouõä]n[aeiouõä][[:>:]]|.+k[äõe][in]ne[[:>:]]";
+
+# viimase SQL-päringu väljund: neitsik_muud_vormid.csv (lisatud esinemise eelmine ja järgmine värsirida)
+
+dat_neitsi <- read.csv("C:/Users/kaarel.veskis/OneDrive - Eesti Kirjandusmuuseum/2022 DOKTORANTUUR AINED/neitsik_muud_vormid.csv", header = T, sep = ";", quote = "\"",
+         dec = ".", fill = TRUE, comment.char = "", encoding = "UTF-8")
+
+library(stringr)
+
+# puhastame kenelõppude tulba liigsest, et jääksid üksnes kene-lõpud
+# veel ei õnnestunud päriselt, veel on mõned ülearused # ja " kene-vormi lõpus
+dat_neitsi %>%
+    mutate(kenelopp = str_replace(kenelopp, "[^[:alnum:] #]", "")) %>% 
+    mutate(kenelopp = gsub(" .*$", "", kenelopp)) -> dat_neits2
+
+t.neitsi_lopud <- table(dat_neits2$kenelopp)
+
+# näitab levinumad mittenominatiivsed neitsi+k.* kene-vormid 
+sort(t.neitsi_lopud, decreasing=TRUE)
+
+# punktuatsiooni eemaldamine:
+neitsi_kenelopp <- str_replace_all(dat_neits2$kenelopp, "[[:punct:]]", "")
+
+# Otsi kõiki neitsik.* jt 19 popima sõnatüve vorme, mis ei tohiks olla kene nominatiiv ja on pikk vähemalt 2 k-le järgnevat tähemärki, väljasta leitud sõnalõpud
+#SELECT C.text AS eelmine_rida, A.text AS rida, B.text AS jargmine_rida, REGEXP_replace(A.text,".+neitsi|.+ella|.+emä|.+peeni|.+hella|.+venni|.+neiu|.+enne|.+vele|.+venna|.+peiu|.+taadi|.+nooru|.+eide|.+ema|.+memme|.+noore|.+velle|.+poisi|.+linnu", "") as kenelopp FROM words
+#JOIN word_occ ON words.w_id=word_occ.w_id
+#JOIN verses AS A ON word_occ.v_id=A.v_id
+#JOIN verses AS B ON A.v_id + 1 = B.v_id
+#JOIN verses AS C ON A.v_id - 1 =C.v_id
+ #JOIN verse_poem ON A.v_id=verse_poem.v_id
+# JOIN poems ON verse_poem.p_id=poems.p_id 
+#WHERE A.type = "V" /*AND B.type="V" */ AND poems.collection = "erab" AND A.text REGEXP "neitsik[aeiouõäü][^,. ][^,. ]*[[:>:]]|ellak[aeiouõäü][^,. ][^,. ]*[[:>:]]|emäk[aeiouõäü][^,. ][^,. ]*[[:>:]]|peenik[aeiouõäü][^,. ][^,. ]*[[:>:]]|hellak[aeiouõäü][^,. ][^,. ]*[[:>:]]|vennik[aeiouõäü][^,. ][^,. ]*[[:>:]]|neiuk[aeiouõäü][^,. ][^,. ]*[[:>:]]|ennek[aeiouõäü][^,. ][^,. ]*[[:>:]]|velek[aeiouõäü][^,. ][^,. ]*[[:>:]]|vennak[aeiouõäü][^,. ][^,. ]*[[:>:]]|peiuk[aeiouõäü][^,. ][^,. ]*[[:>:]]|taadik[aeiouõäü][^,. ][^,. ]*[[:>:]]|nooruk[aeiouõäü][^,. ][^,. ]*[[:>:]]|eidek[aeiouõäü][^,. ][^,. ]*[[:>:]]|emak[aeiouõäü][^,. ][^,. ]*[[:>:]]|memmek[aeiouõäü][^,. ][^,. ]*[[:>:]]|noorek[aeiouõäü][^,. ][^,. ]*[[:>:]]|vellek[aeiouõäü][^,. ][^,. ]*[[:>:]]|poisik[aeiouõäü][^,. ][^,. ]*[[:>:]]|linnuk[aeiouõäü][^,. ][^,. ]*[[:>:]]"
+#AND NOT A.text REGEXP ".+k[aeiouõä]n[aeiouõä][[:>:]]|.+k[äõe][in]ne[[:>:]]";
+
+
+dat_neitsi_jt <- read.csv("C:/Users/kaarel.veskis/OneDrive - Eesti Kirjandusmuuseum/2022 DOKTORANTUUR AINED/20_kene_käänet.csv", header = T, sep = ";", quote = "\"",
+         dec = ".", fill = TRUE, comment.char = "", encoding = "UTF-8")
+
+# puhastame kenelõppude tulba liigsest, et jääksid üksnes kene-lõpud
+# veel ei õnnestunud päriselt, veel on mõned ülearused # ja " kene-vormi lõpus
+dat_neitsi_jt %>%
+    mutate(kenelopp = str_replace(kenelopp, "[^[:alnum:] #]", "")) %>% 
+    mutate(kenelopp = gsub(" .*$", "", kenelopp)) -> dat_neitsi_jt_2
+
+dat_neitsi_jt_2$kenelopp <- str_replace_all(dat_neitsi_jt_2$kenelopp, "[[:punct:]]", "")
+
+t.neitsi_jt_lopud <- as.data.frame(table(dat_neitsi_jt_2$kenelopp))
+
+t.neitsi_jt_lopud[order(t.neitsi_jt_lopud$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(8) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + coord_flip()
+
+
+# Neljas andmestik ja selle analüüs (Värsireaga „neitsikene, noorukene” identsete ja sarnaste värsireaklastrite võrgustik)
+
+dat_neitsikene_noorukene <- read.csv("C:/Users/kaarel.veskis/OneDrive - Eesti Kirjandusmuuseum/2022 DOKTORANTUUR AINED/neitsikene_noorukene_tight.csv", header = T, sep = ",", quote = "\"",
+         dec = ".", fill = TRUE, comment.char = "", encoding = "UTF-8")
+
+
+as.data.frame(table(dat_neitsikene_noorukene$location)) -> t.nooruke_kohad
+
+t.nooruke_kohad[order(t.nooruke_kohad$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(8) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "Deminutiivsete värsiridade kogumiskohad",
+       y = "Sagedus",
+       title = "") + coord_flip()
+
+as.data.frame(table(dat_neitsikene_noorukene$themes)) -> t.nooruke_tyybid
+
+t.nooruke_tyybid[order(t.nooruke_tyybid$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(8) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + coord_flip()
+
+# punktuatsiooni eemaldamine:
+dat_neitsikene_noorukene$text <- str_replace_all(dat_neitsikene_noorukene$text, "[[:punct:]]", "")
+
+as.data.frame(table(dat_neitsikene_noorukene$text)) -> t.nooruke_tekst
+
+t.nooruke_tekst[order(t.nooruke_tekst$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(20) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + coord_flip()
+
+as.data.frame(table(dat_neitsikene_noorukene$collector)) -> t.nooruke_kogujad
+
+t.nooruke_kogujad[order(t.nooruke_kogujad$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + coord_flip()
+
+as.data.frame(table(dat_neitsikene_noorukene$pos)) -> t.nooruke_pos_värsis
+
+t.nooruke_pos_värsis[order(t.nooruke_pos_värsis$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "Deminutiivse värsirea asukoht värsis",
+       y = "Deminutiivse värsirea esinemissagedus",
+       title = "") + coord_flip()
+
+
+# Neitsikene noorukene kontekstid
+# Eesti korpuse värsid, kus esinevad neitsikene ja noorukene variandid KOOS EELMISE JA JÄRGMISE REAGA
+#SELECT C.text AS eelmine_rida, A.text AS rida, B.text AS jargmine_rida FROM words
+  #  JOIN word_occ ON words.w_id=word_occ.w_id
+ #   JOIN verses AS A ON word_occ.v_id=A.v_id
+  #  JOIN verses AS B ON A.v_id + 1 = B.v_id
+  #  JOIN verses AS C ON A.v_id - 1 =C.v_id
+ #   JOIN verse_poem ON A.v_id=verse_poem.v_id
+ #   JOIN poems ON verse_poem.p_id=poems.p_id
+ #   WHERE poems.collection = "erab" AND A.type = "V" AND B.type="V" AND   A.text REGEXP "[[:<:]]neitsik[aeiouõäü][sn][aeiouõäü]*[[:>:]]" AND A.text REGEXP "[[:<:]]n[uo]oruk[aeiouõäü][sn][aeiouõäü]*[[:>:]]";
+    
+    
+# Eesti korpuse värsid, kus esinevad neitsikene ja mitte noorukene variandid KOOS EELMISE JA JÄRGMISE REAGA
+#SELECT C.text AS eelmine_rida, A.text AS rida, B.text AS jargmine_rida FROM words
+  #  JOIN word_occ ON words.w_id=word_occ.w_id
+  #  JOIN verses AS A ON word_occ.v_id=A.v_id
+#    JOIN verses AS B ON A.v_id + 1 = B.v_id
+ #   JOIN verses AS C ON A.v_id - 1 =C.v_id
+ #   JOIN verse_poem ON A.v_id=verse_poem.v_id
+ #   JOIN poems ON verse_poem.p_id=poems.p_id
+ #   WHERE poems.collection = "erab" AND A.type = "V" AND B.type="V"  AND A.text REGEXP "[[:<:]]neitsik[aeiouõäü][sn][aeiouõäü]*[[:>:]]" AND NOT A.text REGEXP "[[:<:]]n[uo]oruk[aeiouõäü][sn][aeiouõäü]*[[:>:]]";
+
+  
+
+dat_neitsikene_ilma_noorukeseta_kontekst <- read.csv("C:/Users/kaarel.veskis/OneDrive - Eesti Kirjandusmuuseum/2022 DOKTORANTUUR AINED/neitsikene_ilma_noorukeseta_kontekst.csv", header = T, sep = ";", quote = "\"",
+         dec = ".", fill = TRUE, comment.char = "", encoding = "UTF-8")
+
+dat_neitsikene_noorukene_kontekst <- read.csv("C:/Users/kaarel.veskis/OneDrive - Eesti Kirjandusmuuseum/2022 DOKTORANTUUR AINED/neitsikene_noorukene_kontekst_erab.csv", header = T, sep = ";", quote = "\"",
+         dec = ".", fill = TRUE, comment.char = "", encoding = "UTF-8")
+
+as.data.frame(table(dat_neitsikene_kontekst$rida)) -> t.neitsikene_rida
+
+t.neitsikene_rida[order(t.neitsikene_rida$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "Deminutiivse värsirea asukoht värsis",
+       y = "Deminutiivse värsirea esinemissagedus",
+       title = "") + coord_flip()
+
+as.data.frame(table(dat_neitsikene_kontekst$jargmine_rida)) -> t.neitsikene_jargmine_rida
+
+t.neitsikene_jargmine_rida[order(t.neitsikene_jargmine_rida$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "Sõnale neitsikene järgnev värsirida",
+       y = "Esinemissagedus",
+       title = "") + coord_flip()
+
+dat_neitsikene_noorukene_kontekst$jargmine_rida <- str_replace_all(dat_neitsikene_noorukene_kontekst$jargmine_rida, "[[:punct:]]", "")
+
+as.data.frame(table(dat_neitsikene_noorukene_kontekst$jargmine_rida)) -> t.neitsikene_noorukene_jargmine_rida
+
+
+
+t.neitsikene_noorukene_jargmine_rida[order(t.neitsikene_noorukene_jargmine_rida$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "'neitsikene noorukene' järgnev värsirida",
+       y = "Esinemissagedus",
+       title = "") + coord_flip()
+
+dat_neitsikene_ilma_noorukeseta_kontekst$jargmine_rida <- str_replace_all(dat_neitsikene_ilma_noorukeseta_kontekst$jargmine_rida, "[[:punct:]]", "")
+
+as.data.frame(table(dat_neitsikene_ilma_noorukeseta_kontekst$jargmine_rida)) -> t.dat_neitsikene_ilma_noorukeseta_jargmine_rida
+
+
+
+t.dat_neitsikene_ilma_noorukeseta_jargmine_rida[order(t.dat_neitsikene_ilma_noorukeseta_jargmine_rida$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "sõnale 'neitsikene' järgnev värsirida",
+       y = "Esinemissagedus",
+       title = "") + coord_flip()
+
+
+
+
+
+dat_neitsikene_noorukene_kontekst$eelmine_rida <- str_replace_all(dat_neitsikene_noorukene_kontekst$eelmine_rida, "[[:punct:]]", "")
+
+as.data.frame(table(dat_neitsikene_noorukene_kontekst$eelmine_rida)) -> t.neitsikene_noorukene_eelmine_rida
+
+
+
+t.neitsikene_noorukene_eelmine_rida[order(t.neitsikene_noorukene_eelmine_rida$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "'neitsikene noorukene' eelmine värsirida",
+       y = "Esinemissagedus",
+       title = "") + coord_flip()
+
+
+
+
+
+dat_neitsikene_ilma_noorukeseta_kontekst$eelmine_rida <- str_replace_all(dat_neitsikene_ilma_noorukeseta_kontekst$eelmine_rida, "[[:punct:]]", "")
+
+as.data.frame(table(dat_neitsikene_ilma_noorukeseta_kontekst$eelmine_rida)) -> t.dat_neitsikene_ilma_noorukeseta_eelmine_rida
+
+
+
+t.dat_neitsikene_ilma_noorukeseta_eelmine_rida[order(t.dat_neitsikene_ilma_noorukeseta_eelmine_rida$Freq),]   %>% mutate(Var1 = reorder(Var1, Freq)) %>% top_n(10) %>%  ggplot(aes(Var1, Freq)) + geom_col() + xlab(NULL) + 
+  labs(x = "'neitsikene' - eelnev värsirida",
+       y = "Esinemissagedus",
+       title = "") + coord_flip()
+
+
+  # järgnev on selleks, et saada kene-sisaldavate värsiridades teiste sõnade sagedusloendit
+# eeskuju siit: https://dk81.github.io/dkmathstats_site/rtext-freq-words.html
+
+
+#install.packages("wordcloud")
+#install.packages("tm")
+packages <- c("wordcloud", "tm")
+
+lapply(packages, require , character.only = TRUE)
+
+
+
+# üheks suureks tekstiks, et saaks kustutada ebavajalikku ja teha sõnapilve
+värsiread_koos <- paste(dat$värsirida, collapse=', ' )
+
+# punktuatsiooni eemaldamine
+värsiread_koos_ilma_punkt <- str_replace_all(värsiread_koos, "[[:punct:]]", "")
+
+# tulemus kõik -kene-värsiridade sõnavormid ühes pikas listis
+dat_värsirida_puhas <- strsplit(värsiread_koos_ilma_punkt, split = " ")
+
+# kene-lõpuliste kustutamine, et saaks sõnapilve teha ülejäänutest
+
+# et saaks kasutada gsub järgnevalt, sest see töötas character tüüpi objektil
+unlisted_värsirida <- unlist(dat_värsirida_puhas)
+
+
+# järgnev ei tööta stoppsõnade osas, kuigi see töötas:
+# test <- "abcegdfk461mnb"
+# test2 <- gsub("e|4|6","",test)
+# print(test2)
+
+(värsiread_koos_ilma_kenedeta <- gsub(pattern="^.*k[aeiouõä]n[aeiouõä].? *$|^ *minu *$|^ *sina *$|^ *oma *$|^ *sul *$|^ *see *$|^ *ära *$|^ *ole *$|^ *mulle *$|^ *see *$|^ *küll *$|^ *siis *$|^ *või *$|^ *meie *$|^ *mis *$|^ *kui|^ *[Mm]ina *$ *$|^ *oli *$|^ *aga *$|^ *all *$|^ *alla *$|^ *ega *$|^ *ära *$|^ *oll *$|^ *olli *$|^ *ma *$|^ *mul *$|^ *kas *$|^ *mul *$|^ *mull *$|^ *kos *$|^ *mino *$|^ *maha *$|^ *kus *$|^ *nüüd *$|^ *sinna *$|^ *vastu *$|^ *ikka *$|^ *ennekeine *$|^ *linnukeine *$",
+        replacement="",
+        x=unlisted_värsirida, ignore.case = T))
+
+# fruits <- c("kaks neitsikene", "kolm kõnõ", "neli")
+
+
+
+### Making a Wordcloud:
+
+# Clean up data; convert to lowercase, remove quotes, whitespace, punctuation, stopwords, etc.
+# Ref: https://www.youtube.com/watch?v=lRTerj8fdY0 # https://dk81.github.io/dkmathstats_site/rtext-freq-words.html
+# Wordcloud with colours:
+
+peter_pan <- värsiread_koos_ilma_kenedeta
+
+peter_text <- Corpus(VectorSource(peter_pan))
+
+peter_text_clean <- tm_map(peter_text, removePunctuation)
+
+peter_text_clean <- tm_map(peter_text_clean, content_transformer(tolower))
+
+peter_text_clean <- tm_map(peter_text_clean, removeNumbers)
+
+peter_text_clean <- tm_map(peter_text_clean, stripWhitespace)
+
+
+wordcloud(peter_text_clean, scale = c(2, 1), min.freq = 1500, colors = rainbow(30))
+
+
+
+
+```
+
+\`\`\`

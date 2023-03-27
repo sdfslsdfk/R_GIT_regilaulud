@@ -1,0 +1,5 @@
+poisikene	`poiskõsõ	pl
+madalakene	madalakkõsõ	pl
+väike	`väikkese	pl
+raske	rassõ	sg
+talu+inimesekene	talu+inem'isek'k'ine	sg

@@ -1,0 +1,7 @@
+väike	`väikke	sg
+siuke	`söukke	sg
+seike	`seikke	sg
+seike	`seikke	sg
+pisike	pisikke	sg
+seike	`seiksed	pl
+seike	`seiksed	pl

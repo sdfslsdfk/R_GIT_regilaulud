@@ -1,0 +1,14 @@
+siuke	siuksed	pl
+nisuke	nisukke	sg
+nisuke	nisukke	sg
+niisuke	niisukke	sg
+nisuke	nisukke	sg
+nisuke	nisukke	sg
+niuke	niuksed	pl
+õhuke	õhuksed	pl
+niuke	niuksed	pl
+niuke	`niuksed	pl
+niuke	niuksed	pl
+niuke	niuksed	pl
+niuke	niuksed	pl
+väike	väikke	sg

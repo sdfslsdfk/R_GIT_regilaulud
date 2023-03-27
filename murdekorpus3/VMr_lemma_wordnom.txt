@@ -1,0 +1,4 @@
+väike	veikked	pl
+lühikene	lühikkesed	pl
+väike	vekked	pl
+lühikene	lühikkest	pl

@@ -1,0 +1,16 @@
+väike	`väikke	sg
+talu+kene	talukkene	sg
+taeva+kene	`taivakkõ	sg
+like	likke	sg
+peenike	peen'ikke	sg
+väikene	`väikkene	sg
+poisi+kene	`poiskõnõ	sg
+väikene	`väikkene	sg
+väikese+kene	`väiksekkene	sg
+väike	`väikke	sg
+tüki+kene	tük'kikkene	sg
+lapse+kene	`laitskese	pl
+lapse+kene	`laitskese	pl
+mamma+kene	mammakkõnõ	sg
+peenike	*peenikse	pl
+värske	`värske	sg

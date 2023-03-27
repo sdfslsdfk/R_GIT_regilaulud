@@ -1,0 +1,1 @@
+# Sõnavormide arv murdekorpuses kihelkonniti + deminutiivsete lemmadega sõnavormide arv kihelkonniti

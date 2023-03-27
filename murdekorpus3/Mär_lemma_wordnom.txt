@@ -1,0 +1,16 @@
+väike	`väikke	sg
+poiss+ke	poisikke	sg
+niuke	`niukkene	sg
+raske	`raske	sg
+niuke	`niukke	sg
+väike	väikst	pl
+niuke	`niukke	sg
+niuke	`niukke	sg
+väike	väik	sg
+väike	väikst	pl
+lühike	lühikst	pl
+lühike	lühigsed	pl
+lühike	lühiksed	pl
+väike	`väikke	sg
+väike	`väikke	sg
+väike	`väikke	sg
